@@ -6,12 +6,27 @@ require "tomlrb"
 
 class BoostFromBookmark
   def call
+    if rand > threshold
+      $stderr.puts "Not performing as lottery failed"
+      return
+    end
+    $stderr.puts "Finding bookmarks..."
     bookmarks = bookmark_stream.take(100)
     bookmark = bookmarks.sample
-    unless bookmark["reblogged"]
+    unless bookmark
+      $stderr.puts "No bookmarks found"
+      return
+    end
+
+    $stderr.puts "Boosting a status #{bookmark["id"]}..."
+    if bookmark["reblogged"]
+      $stderr.puts "Already boosted"
+    else
       boost_status(bookmark["id"])
+      $stderr.puts "Boosted"
     end
     unbookmark_status(bookmark["id"])
+    $stderr.puts "Unbookmarked; done"
   end
 
   def config
@@ -83,6 +98,10 @@ class BoostFromBookmark
 
   def access_token
     config["user"]["access_token"] || (raise "No access_token configured")
+  end
+
+  def threshold
+    config["lottery"]["threshold"]
   end
 end
 

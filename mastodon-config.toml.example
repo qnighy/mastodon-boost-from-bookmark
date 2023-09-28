@@ -5,3 +5,6 @@ client_secret = ""
 
 [user]
 access_token = ""
+
+[lottery]
+threshold = 1
