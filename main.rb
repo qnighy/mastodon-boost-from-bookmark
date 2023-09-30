@@ -11,7 +11,7 @@ class BoostFromBookmark
       return
     end
     $stderr.puts "Finding bookmarks..."
-    bookmarks = bookmark_stream.take(100)
+    bookmarks = bookmark_stream.take(300)
     bookmark = bookmarks.sample
     unless bookmark
       $stderr.puts "No bookmarks found"
