@@ -4,6 +4,15 @@
 require "faraday"
 require "tomlrb"
 
+class Array
+  def skew_sample(skew_ratio)
+    reverse_each do |item|
+      return item if rand < skew_ratio
+    end
+    sample
+  end
+end
+
 class BoostFromBookmark
   def call
     if rand > threshold
@@ -11,8 +20,8 @@ class BoostFromBookmark
       return
     end
     $stderr.puts "Finding bookmarks..."
-    bookmarks = bookmark_stream.take(300)
-    bookmark = bookmarks.sample
+    bookmarks = bookmark_stream.take(1000)
+    bookmark = bookmarks.skew_sample(0.1)
     unless bookmark
       $stderr.puts "No bookmarks found"
       return
