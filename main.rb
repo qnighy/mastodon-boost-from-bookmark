@@ -4,15 +4,6 @@
 require "faraday"
 require "tomlrb"
 
-class Array
-  def skew_sample(skew_ratio)
-    reverse_each do |item|
-      return item if rand < skew_ratio
-    end
-    sample
-  end
-end
-
 class BoostFromBookmark
   def call
     if rand > threshold
@@ -20,8 +11,7 @@ class BoostFromBookmark
       return
     end
     $stderr.puts "Finding bookmarks..."
-    bookmarks = bookmark_stream.take(1000)
-    bookmark = bookmarks.skew_sample(0.1)
+    bookmark = sample_bookmark
     unless bookmark
       $stderr.puts "No bookmarks found"
       return
@@ -38,6 +28,16 @@ class BoostFromBookmark
     $stderr.puts "Unbookmarked; done"
   end
 
+  def sample_bookmark
+    ratio = [0.1, 0.01].sample
+    bookmarks = []
+    reverse_bookmark_stream.each do |bookmark|
+      return bookmark if rand < ratio
+      bookmarks << bookmark
+    end
+    bookmarks.sample
+  end
+
   def config
     @config ||= Tomlrb.load_file("mastodon-config.toml")
   end
@@ -50,21 +50,21 @@ class BoostFromBookmark
     client.post("/api/v1/statuses/#{id}/unbookmark?id=#{id}")
   end
 
-  def bookmark_stream
-    enum_for(:each_bookmarks)
+  def reverse_bookmark_stream
+    enum_for(:reverse_each_bookmarks)
   end
 
-  def each_bookmarks
-    url = "/api/v1/bookmarks"
+  def reverse_each_bookmarks
+    url = "/api/v1/bookmarks?min_id=0"
     loop do
       resp = client.get(url)
-      resp.body.each do |bookmark|
+      resp.body.reverse_each do |bookmark|
         yield bookmark
       end
       links = parse_link(resp.headers["link"])
-      next_link = links.find { |link| link[:rel] == "next" }
-      break if next_link.nil? || resp.body.empty?
-      url = next_link[:uri]
+      prev_link = links.find { |link| link[:rel] == "prev" }
+      break if prev_link.nil? || resp.body.empty?
+      url = prev_link[:uri]
     end
   end
 
