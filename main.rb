@@ -29,7 +29,7 @@ class BoostFromBookmark
   end
 
   def sample_bookmark
-    ratio = [0.1, 0.01].sample
+    ratio = [0.1, 0.03, 0.01, 0.003].sample
     bookmarks = []
     reverse_bookmark_stream.each do |bookmark|
       return bookmark if rand < ratio
