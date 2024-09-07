@@ -8,3 +8,4 @@ access_token = ""
 
 [lottery]
 threshold = 1
+retention_days = 30

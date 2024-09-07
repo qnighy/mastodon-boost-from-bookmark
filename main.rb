@@ -1,6 +1,7 @@
 #!/usr/bin/ruby
 # frozen_string_literal: true
 
+require "time"
 require "faraday"
 require "tomlrb"
 
@@ -15,6 +16,15 @@ class BoostFromBookmark
     unless bookmark
       $stderr.puts "No bookmarks found"
       return
+    end
+
+    if retention_days
+      require_older_than = Time.now - retention_days * 24 * 60 * 60
+      created_at = Time.iso8601(bookmark["created_at"])
+      if created_at > require_older_than
+        $stderr.puts "Bookmark too new (status: #{bookmark["id"]}, post created at: #{created_at})"
+        return
+      end
     end
 
     $stderr.puts "Boosting a status #{bookmark["id"]}..."
@@ -111,6 +121,10 @@ class BoostFromBookmark
 
   def threshold
     config["lottery"]["threshold"]
+  end
+
+  def retention_days
+    config["lottery"]["retention_days"]
   end
 end
 
