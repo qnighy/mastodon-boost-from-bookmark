@@ -18,16 +18,18 @@ class BoostFromBookmark
       return
     end
 
+    status_url = "https://#{domain}/@#{bookmark["account"]["acct"]}/#{bookmark["id"]}"
+
     if retention_days
       require_older_than = Time.now - retention_days * 24 * 60 * 60
       created_at = Time.iso8601(bookmark["created_at"])
       if created_at > require_older_than
-        $stderr.puts "Bookmark too new (status: #{bookmark["id"]}, post created at: #{created_at})"
+        $stderr.puts "Bookmark too new (status: #{status_url}, post created at: #{created_at})"
         return
       end
     end
 
-    $stderr.puts "Boosting a status #{bookmark["id"]}..."
+    $stderr.puts "Boosting a status #{status_url}..."
     if bookmark["reblogged"]
       $stderr.puts "Already boosted"
     else
