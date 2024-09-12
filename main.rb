@@ -33,7 +33,13 @@ class BoostFromBookmark
     if bookmark["reblogged"]
       $stderr.puts "Already boosted"
     else
-      boost_status(bookmark["id"])
+      begin
+        boost_status(bookmark["id"])
+      rescue Faraday::ResourceNotFound
+        $stderr.puts "Post not found; removing bookmark"
+        unbookmark_status(bookmark["id"])
+        raise
+      end
       $stderr.puts "Boosted"
     end
     unbookmark_status(bookmark["id"])
