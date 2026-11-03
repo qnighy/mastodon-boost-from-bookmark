@@ -1,28 +1,33 @@
 #!/usr/bin/ruby
 # frozen_string_literal: true
 
+require "logger"
 require "optparse"
 require "time"
 require "faraday"
 require "tomlrb"
 
 class BoostFromBookmark
-  attr_reader :config_file
+  attr_reader :config_file, :logger
 
-  def initialize(config_file: "mastodon-config.toml")
+  def initialize(config_file: "mastodon-config.toml", logger: Logger.new($stderr))
     @config_file = File.expand_path(config_file)
+    @logger = logger
   end
 
   def call
+    logger.debug { "Using config file #{config_file}" }
     validate_config
-    if rand > threshold
-      $stderr.puts "Not performing as lottery failed"
+    roll = rand
+    if roll > threshold
+      logger.info { "Not performing as lottery failed (roll: #{roll.round(4)}, threshold: #{threshold})" }
       return
     end
-    $stderr.puts "Finding bookmarks..."
+    logger.debug { "Lottery passed (roll: #{roll.round(4)}, threshold: #{threshold})" }
+    logger.info "Finding bookmarks..."
     bookmark = sample_bookmark
     unless bookmark
-      $stderr.puts "No bookmarks found"
+      logger.info "No bookmarks found"
       return
     end
 
@@ -32,35 +37,40 @@ class BoostFromBookmark
       require_older_than = Time.now - retention_days * 24 * 60 * 60
       created_at = Time.iso8601(bookmark["created_at"])
       if created_at > require_older_than
-        $stderr.puts "Bookmark too new (status: #{status_url}, post created at: #{created_at})"
+        logger.info { "Bookmark too new (status: #{status_url}, post created at: #{created_at}, retention: #{retention_days} days)" }
         return
       end
     end
 
-    $stderr.puts "Boosting a status #{status_url}..."
+    logger.info "Boosting a status #{status_url}..."
     if bookmark["reblogged"]
-      $stderr.puts "Already boosted"
+      logger.info "Already boosted"
     else
       begin
         boost_status(bookmark["id"])
       rescue Faraday::ResourceNotFound
-        $stderr.puts "Post not found; removing bookmark"
+        logger.warn "Post not found; removing bookmark (status: #{status_url})"
         unbookmark_status(bookmark["id"])
         raise
       end
-      $stderr.puts "Boosted"
+      logger.info "Boosted"
     end
     unbookmark_status(bookmark["id"])
-    $stderr.puts "Unbookmarked; done"
+    logger.info "Unbookmarked; done"
   end
 
   def sample_bookmark
     ratio = [0.03, 0.003, 0.001, 0.0003].sample
+    logger.debug { "Sampling bookmarks with ratio #{ratio}" }
     bookmarks = []
     reverse_bookmark_stream.each do |bookmark|
-      return bookmark if rand < ratio
+      if rand < ratio
+        logger.debug { "Picked bookmark after scanning #{bookmarks.size + 1} bookmarks" }
+        return bookmark
+      end
       bookmarks << bookmark
     end
+    logger.debug { "Reached the end of #{bookmarks.size} bookmarks; picking uniformly" }
     bookmarks.sample
   end
 
@@ -83,6 +93,7 @@ class BoostFromBookmark
   def reverse_each_bookmarks
     url = "/api/v1/bookmarks?min_id=0"
     loop do
+      logger.debug { "Fetching #{url}" }
       resp = client.get(url)
       resp.body.reverse_each do |bookmark|
         yield bookmark
@@ -171,11 +182,28 @@ class BoostFromBookmark
   end
 end
 
-options = {}
+logger = Logger.new($stderr, level: ENV.fetch("LOG_LEVEL", "info"))
+options = { logger: }
 OptionParser.new do |opts|
   opts.banner = "Usage: #{$0} [options]"
   opts.on("-c", "--config FILE", "Config file (default: ./mastodon-config.toml)") do |v|
     options[:config_file] = v
   end
+  opts.on("-v", "--verbose", "Enable debug logging (or set LOG_LEVEL=debug)") do
+    logger.level = Logger::DEBUG
+  end
 end.parse!
-BoostFromBookmark.new(**options).call
+
+begin
+  BoostFromBookmark.new(**options).call
+rescue Faraday::Error => e
+  request = e.response&.dig(:request)
+  request_info = " (#{request[:method].to_s.upcase} #{request[:url]})" if request
+  logger.error { "#{e.class}: #{e.message}#{request_info}" }
+  logger.debug { e.full_message(highlight: false) }
+  exit 1
+rescue StandardError => e
+  logger.error { "#{e.class}: #{e.message}" }
+  logger.debug { e.full_message(highlight: false) }
+  exit 1
+end
