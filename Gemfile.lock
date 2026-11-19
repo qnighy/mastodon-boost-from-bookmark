@@ -1,16 +1,23 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    base64 (0.1.1)
-    faraday (2.7.11)
-      base64
-      faraday-net_http (>= 2.0, < 3.1)
-      ruby2_keywords (>= 0.0.4)
-    faraday-net_http (3.0.2)
+    faraday (2.15.1)
+      faraday-net_http (>= 2.0, < 3.6)
+      json
+      logger
+    faraday-net_http (3.5.0)
+      net-http (~> 0.5)
+    json (3.1.0)
     logger (1.7.0)
+    net-http (0.10.0)
+      net-protocol (>= 0.3.0)
+      uri (>= 0.11.1)
+    net-protocol (0.4.0)
+      timeout
     racc (1.8.1)
-    ruby2_keywords (0.0.5)
-    tomlrb (2.0.3)
+    timeout (0.6.1)
+    tomlrb (3.0.0)
+    uri (1.1.2)
 
 PLATFORMS
   aarch64-linux
